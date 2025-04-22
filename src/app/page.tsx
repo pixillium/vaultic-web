@@ -5,11 +5,30 @@ import AddAuthenticatorButton from "@/components/base/add-authenticator";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Vaultic - 2FA Manager",
+  title: "Vaultic: Secure 2FA Manager – Private, In-Browser, Backup Support",
   description:
-    "A privacy-focused 2FA manager that stores all data locally in your browser",
+    "Manage all your 2FA codes securely in your browser. No cloud, no tracking. Export backups to stay safe across devices. 100% private.",
+  openGraph: {
+    title: "Vaultic: Secure 2FA Manager – Private, In-Browser, Backup Support",
+    description:
+      "Manage all your 2FA codes securely in your browser. No cloud, no tracking. Export backups to stay safe across devices. 100% private.",
+    url: "https://vaultic.is-cool.dev",
+    images: [
+      {
+        url: "/thumbnail.png",
+        width: 1200,
+        height: 630,
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Vaultic: Secure 2FA Manager – Private, In-Browser, Backup Support",
+    description:
+      "Manage all your 2FA codes securely in your browser. No cloud, no tracking. Export backups to stay safe across devices. 100% private.",
+    images: ["/thumbnail.png"],
+  },
 };
-
 export default function Home() {
   return (
     <>
