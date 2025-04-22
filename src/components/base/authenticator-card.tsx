@@ -27,6 +27,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { useAppContext } from "@/lib/context";
 import EditAuthenticatorDialog from "./edit-authenticator-dialog";
+import ServiceLogo from "./service-logo"
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -114,12 +115,10 @@ export default function AuthenticatorCard({
         </div>
         <CardHeader>
           <div className="flex justify-between items-start">
+          	 <ServiceLogo name={authenticator.name} />
             <div>
               <h3 className="font-semibold text-lg">{authenticator.name}</h3>
-              {authenticator.email && (
-                <p className="text-sm text-muted-foreground">
-                  {authenticator.email}
-                </p>
+              <p className="text-sm text-muted-foreground">{authenticator.email ? authenticator.email : "No email"}</p>
               )}
             </div>
             <div className="flex items-center gap-2">
