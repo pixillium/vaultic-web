@@ -1,7 +1,7 @@
 import { twMerge } from "tailwind-merge";
 import { type ClassValue, clsx } from "clsx";
+import { authenticator } from "otplib";
 
-import otplib from "otplib";
 import base32Decode from "base32-decode";
 
 export function cn(...inputs: ClassValue[]) {
@@ -10,7 +10,7 @@ export function cn(...inputs: ClassValue[]) {
 
 export function generateOTP(secret: string): string {
   try {
-    return otplib.authenticator.generate(secret);
+    return authenticator.generate(secret);
   } catch (error) {
     console.error("Error generating code:", error);
     return "Invalid";
