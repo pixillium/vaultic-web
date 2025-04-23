@@ -106,10 +106,12 @@ export default function GroupsManagement() {
             You haven&apos;t created any groups yet.
           </p>
         ) : (
-          <ScrollArea className="space-y-2 max-h-[400px]">
-            {groups.map((group) => (
-              <GroupCard key={group.id} group={group} />
-            ))}
+          <ScrollArea className="h-[70px]">
+            <div className="space-y-2">
+              {groups.map((group) => (
+                <GroupCard key={group.id} group={group} />
+              ))}
+            </div>
           </ScrollArea>
         )}
       </div>

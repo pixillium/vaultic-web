@@ -99,45 +99,47 @@ export default function EmailsManagement() {
             You haven&apos;t added any email addresses yet.
           </p>
         ) : (
-          <ScrollArea className="space-y-2 max-h-[200px]">
-            {emails.map((email) => (
-              <div
-                key={email.id}
-                className="flex items-center justify-between px-4 py-2 border rounded-lg"
-              >
-                <span>{email.address}</span>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive"
-                    >
-                      <Trash2 size={16} />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent className="!max-w-md">
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Email</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Are you sure you want to delete this email address?
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel className="cursor-pointer">
-                        <X className="mr-2 h-4 w-4" /> Cancel
-                      </AlertDialogCancel>
-                      <AlertDialogAction
-                        className="bg-red-500 hover:bg-red-600 cursor-pointer"
-                        onClick={() => handleDeleteEmail(email.id)}
+          <ScrollArea className="h-[200px]">
+            <div className="space-y-2">
+              {emails.map((email) => (
+                <div
+                  key={email.id}
+                  className="flex items-center justify-between px-4 py-2 border rounded-lg"
+                >
+                  <span>{email.address}</span>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive"
                       >
-                        <Trash2 className="mr-2 h-4 w-4" /> Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            ))}
+                        <Trash2 size={16} />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="!max-w-md">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Email</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete this email address?
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="cursor-pointer">
+                          <X className="mr-2 h-4 w-4" /> Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-red-500 hover:bg-red-600 cursor-pointer"
+                          onClick={() => handleDeleteEmail(email.id)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" /> Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              ))}
+            </div>
           </ScrollArea>
         )}
       </CardContent>

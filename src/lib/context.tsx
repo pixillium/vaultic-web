@@ -24,6 +24,7 @@ import {
   importData as importDbData,
   exportData as exportDbData,
 } from "@/lib/db";
+import { encryptData, decryptData } from "@/lib/crypto";
 
 interface AppContextType {
   authenticators: Authenticator[];
@@ -32,8 +33,10 @@ interface AppContextType {
   loading: boolean;
   searchQuery: string;
   groupFilter: string;
+  masterKey: string | null;
   setSearchQuery: (query: string) => void;
   setGroupFilter: (groupId: string) => void;
+  setMasterKey: (key: string) => void;
   addNewAuthenticator: (
     authenticator: Omit<
       Authenticator,
@@ -70,6 +73,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [groupFilter, setGroupFilter] = useState("all");
+  const [masterKey, setMasterKey] = useState<string | null>(null);
 
   const refreshData = useCallback(async () => {
     try {
@@ -79,7 +83,45 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         getAllGroups(),
         getAllEmails(),
       ]);
-      setAuthenticators(authData);
+
+      if (masterKey) {
+        // Decrypt the authenticators' data
+        const decryptedAuthData = await Promise.all(
+          authData.map(async (auth) => {
+            try {
+              // Convert base64 back to ArrayBuffer and decrypt
+              const secretBuffer = Uint8Array.from(atob(auth.secret), (c) =>
+                c.charCodeAt(0)
+              ).buffer;
+              const decryptedSecret = await decryptData(
+                secretBuffer,
+                masterKey
+              );
+
+              let decryptedEmail;
+              if (auth.email) {
+                const emailBuffer = Uint8Array.from(atob(auth.email), (c) =>
+                  c.charCodeAt(0)
+                ).buffer;
+                decryptedEmail = await decryptData(emailBuffer, masterKey);
+              }
+
+              return {
+                ...auth,
+                secret: decryptedSecret,
+                email: decryptedEmail || auth.email,
+              };
+            } catch (error) {
+              console.error("Failed to decrypt authenticator:", error);
+              return auth;
+            }
+          })
+        );
+        setAuthenticators(decryptedAuthData);
+      } else {
+        setAuthenticators(authData);
+      }
+
       setGroups(groupData);
       setEmails(emailData);
     } catch (error) {
@@ -87,7 +129,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [masterKey]);
 
   useEffect(() => {
     refreshData();
@@ -99,7 +141,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       "id" | "createdAt" | "updatedAt" | "order"
     >
   ) => {
-    await addAuthenticator(authenticator);
+    if (!masterKey) throw new Error("Master key not set");
+
+    const encryptedSecret = await encryptData(authenticator.secret, masterKey);
+    const encryptedEmail = authenticator.email
+      ? await encryptData(authenticator.email, masterKey)
+      : undefined;
+
+    // Convert ArrayBuffer to base64 string
+    const secretString = btoa(
+      String.fromCharCode(...new Uint8Array(encryptedSecret))
+    );
+    const emailString = encryptedEmail
+      ? btoa(String.fromCharCode(...new Uint8Array(encryptedEmail)))
+      : undefined;
+
+    await addAuthenticator({
+      ...authenticator,
+      secret: secretString,
+      email: emailString,
+    });
     await refreshData();
   };
 
@@ -107,7 +168,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     id: string,
     authenticator: Partial<Omit<Authenticator, "id" | "createdAt">>
   ) => {
-    await updateAuthenticator(id, authenticator);
+    if (!masterKey) throw new Error("Master key not set");
+
+    const encryptedData: Partial<Omit<Authenticator, "id" | "createdAt">> = {
+      ...authenticator,
+    };
+
+    if (authenticator.secret) {
+      const encryptedSecret = await encryptData(
+        authenticator.secret,
+        masterKey
+      );
+      encryptedData.secret = btoa(
+        String.fromCharCode(...new Uint8Array(encryptedSecret))
+      );
+    }
+
+    if (authenticator.email) {
+      const encryptedEmail = await encryptData(authenticator.email, masterKey);
+      encryptedData.email = btoa(
+        String.fromCharCode(...new Uint8Array(encryptedEmail))
+      );
+    }
+
+    await updateAuthenticator(id, encryptedData);
     await refreshData();
   };
 
@@ -170,6 +254,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     groupFilter,
     setSearchQuery,
     setGroupFilter,
+    setMasterKey,
     addNewAuthenticator,
     updateExistingAuthenticator,
     removeAuthenticator,
@@ -184,7 +269,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     emailExists,
   };
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider value={{ ...value, masterKey }}>
+      {children}
+    </AppContext.Provider>
+  );
 }
 
 export function useAppContext() {

@@ -115,12 +115,14 @@ export default function AuthenticatorCard({
         </div>
         <CardHeader>
           <div className="flex justify-between items-start">
-            <ServiceLogo name={authenticator.name} />
-            <div>
-              <h3 className="font-semibold text-lg">{authenticator.name}</h3>
-              <p className="text-sm text-muted-foreground">
-                {authenticator.email ? authenticator.email : "No email"}
-              </p>
+            <div className="flex items-center gap-2">
+              <ServiceLogo name={authenticator.name} />
+              <div>
+                <h3 className="font-semibold text-lg">{authenticator.name}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {authenticator.email ? authenticator.email : "No email"}
+                </p>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               {group && (

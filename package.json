@@ -1,7 +1,23 @@
 {
   "name": "vaultic",
   "version": "1.1.1",
-  "private": true,
+  "private": false,
+  "description": "A Next.js-based project for Vaultic",
+  "author": "Pixillium",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pixillium/vaultic-web.git"
+  },
+  "bugs": {
+    "url": "https://github.com/pixillium/vaultic-web/issues"
+  },
+  "homepage": "https://github.com/pixillium/vaultic-web#readme",
+  "keywords": [
+    "next.js",
+    "react",
+    "typescript"
+  ],
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",

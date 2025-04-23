@@ -1,20 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Vaultic
+
+A Next.js-based project for [brief project description].
+
+## Features
+
+- [List key features]
+- Built with Next.js and TypeScript
+- Modern UI with [mention any UI frameworks you're using]
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18.0 or later
+- pnpm (recommended) or npm
+
+### Installation
+
+1. Clone the repository
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+git clone https://github.com/pixillium/vaultic-web.git
+cd vaultic
+```
+
+2. Install dependencies
+
+```bash
+pnpm install
+```
+
+3. Run the development server
+
+```bash
 pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+## Project Structure
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 

@@ -46,30 +46,46 @@ interface TwoFAManagerDB extends DBSchema {
     key: string;
     value: Email;
   };
+  masterKey: {
+    key: string;
+    value: {
+      id: string;
+      salt: ArrayBuffer;
+      hash: ArrayBuffer;
+      initialized: boolean;
+    };
+  };
 }
 
 const DB_NAME = "2fa-manager-db";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBPDatabase<TwoFAManagerDB>> | null = null;
 
 export function getDB() {
   if (!dbPromise) {
     dbPromise = openDB<TwoFAManagerDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        // Create authenticators store
-        const authenticatorsStore = db.createObjectStore("authenticators", {
-          keyPath: "id",
-        });
-        authenticatorsStore.createIndex("by-group", "groupId");
-        authenticatorsStore.createIndex("by-order", "order");
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          // Create authenticators store
+          const authenticatorsStore = db.createObjectStore("authenticators", {
+            keyPath: "id",
+          });
+          authenticatorsStore.createIndex("by-group", "groupId");
+          authenticatorsStore.createIndex("by-order", "order");
 
-        // Create groups store
-        const groupsStore = db.createObjectStore("groups", { keyPath: "id" });
-        groupsStore.createIndex("by-order", "order");
+          // Create groups store
+          const groupsStore = db.createObjectStore("groups", { keyPath: "id" });
+          groupsStore.createIndex("by-order", "order");
 
-        // Create emails store
-        db.createObjectStore("emails", { keyPath: "id" });
+          // Create emails store
+          db.createObjectStore("emails", { keyPath: "id" });
+        }
+
+        if (oldVersion < 2) {
+          // Add master key store in version 2
+          db.createObjectStore("masterKey", { keyPath: "id" });
+        }
       },
     });
   }
@@ -385,4 +401,81 @@ export async function mergeImportedData(importedData: {
     console.error("Error processing emails:", error);
     throw error;
   }
+}
+
+// Add new functions for master key management
+export async function isMasterKeySet(): Promise<boolean> {
+  const db = await getDB();
+  const masterKeyData = await db.get("masterKey", "master");
+  return !!masterKeyData?.initialized;
+}
+
+export async function setMasterKey(password: string): Promise<void> {
+  const db = await getDB();
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const encoder = new TextEncoder();
+  const passwordData = encoder.encode(password);
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    passwordData,
+    { name: "PBKDF2" },
+    false,
+    ["deriveBits"]
+  );
+
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt,
+      iterations: 100000,
+      hash: "SHA-256",
+    },
+    key,
+    256
+  );
+
+  await db.put("masterKey", {
+    id: "master",
+    salt: salt.buffer,
+    hash: derivedBits,
+    initialized: true,
+  });
+}
+
+export async function verifyMasterKey(password: string): Promise<boolean> {
+  const db = await getDB();
+  const masterKeyData = await db.get("masterKey", "master");
+
+  if (!masterKeyData) return false;
+
+  const encoder = new TextEncoder();
+  const passwordData = encoder.encode(password);
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    passwordData,
+    { name: "PBKDF2" },
+    false,
+    ["deriveBits"]
+  );
+
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt: masterKeyData.salt,
+      iterations: 100000,
+      hash: "SHA-256",
+    },
+    key,
+    256
+  );
+
+  // Compare the hashes
+  const newHash = new Uint8Array(derivedBits);
+  const storedHash = new Uint8Array(masterKeyData.hash);
+
+  if (newHash.length !== storedHash.length) return false;
+
+  return newHash.every((value, index) => value === storedHash[index]);
 }
