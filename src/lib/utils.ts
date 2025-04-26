@@ -2,8 +2,6 @@ import { twMerge } from "tailwind-merge";
 import { type ClassValue, clsx } from "clsx";
 import { authenticator } from "otplib";
 
-import base32Decode from "base32-decode";
-
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -30,23 +28,18 @@ export const DEFAULT_GROUP_COLORS = [
   "#ef4444", // red
   "#f97316", // orange
   "#f59e0b", // amber
+  "#eab308", // yellow
   "#84cc16", // lime
+  "#22c55e", // green
   "#10b981", // emerald
+  "#14b8a6", // teal
   "#06b6d4", // cyan
+  "#0ea5e9", // sky
   "#3b82f6", // blue
+  "#6366f1", // indigo
   "#8b5cf6", // violet
+  "#a855f7", // purple
   "#d946ef", // fuchsia
   "#ec4899", // pink
+  "#f43f5e", // rose
 ];
-
-export function validateSecret(secret: string) {
-  const cleaned = secret.replace(/\s+/g, "").toUpperCase();
-  if (!/^[A-Z2-7]+=*$/.test(cleaned)) return false;
-
-  try {
-    const decoded = new Uint8Array(base32Decode(cleaned, "RFC4648"));
-    return decoded.length >= 10;
-  } catch {
-    return false;
-  }
-}

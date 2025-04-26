@@ -4,6 +4,9 @@ import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { getLogoUrl, updateLogoCache, extractDomain } from "@/lib/logo-utils";
 
+// Cache to store logo states
+const logoStateCache: Record<string, { url: string | null; hasError: boolean }> = {};
+
 interface ServiceLogoProps {
   name: string;
   size?: number;
@@ -15,17 +18,27 @@ export default function ServiceLogo({ name, size = 32 }: ServiceLogoProps) {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
+    // Check cache first
+    if (logoStateCache[name]) {
+      setLogoUrl(logoStateCache[name].url);
+      setHasError(logoStateCache[name].hasError);
+      setIsLoading(false);
+      return;
+    }
+
     // Get the logo URL for this service name
     const url = getLogoUrl(name);
     setLogoUrl(url);
 
-    // Reset states when name changes
+    // Reset states when name changes and not in cache
     setIsLoading(!!url);
     setHasError(false);
   }, [name]);
 
   const handleImageLoad = () => {
     setIsLoading(false);
+    // Cache successful load
+    logoStateCache[name] = { url: logoUrl, hasError: false };
 
     // Update cache that this image exists
     if (logoUrl) {
@@ -39,6 +52,8 @@ export default function ServiceLogo({ name, size = 32 }: ServiceLogoProps) {
   const handleImageError = () => {
     setIsLoading(false);
     setHasError(true);
+    // Cache error state
+    logoStateCache[name] = { url: logoUrl, hasError: true };
 
     // Update cache that this image doesn't exist
     if (logoUrl) {

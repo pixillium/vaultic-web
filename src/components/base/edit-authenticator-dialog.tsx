@@ -23,10 +23,11 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 
 import type { Authenticator } from "@/lib/db";
-import { validateSecret } from "@/lib/utils";
 import { useAppContext } from "@/lib/context";
 
 import { toast } from "sonner";
+import isBase64 from "is-base64";
+
 interface EditAuthenticatorDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -90,7 +91,7 @@ export default function EditAuthenticatorDialog({
       return;
     }
 
-    if (!validateSecret(secret)) {
+    if (!isBase64(secret)) {
       setSecretError("Invalid secret key format");
       return;
     }
@@ -123,7 +124,7 @@ export default function EditAuthenticatorDialog({
 
   const handleSecretChange = (value: string) => {
     setSecret(value);
-    if (secretError && validateSecret(value)) {
+    if (secretError && isBase64(value)) {
       setSecretError("");
     }
   };

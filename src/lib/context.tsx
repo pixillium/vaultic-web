@@ -5,6 +5,7 @@ import {
   createContext,
   useContext,
   useState,
+  useReducer,
   useEffect,
   useCallback,
 } from "react";
@@ -21,8 +22,10 @@ import {
   deleteGroup,
   addEmail,
   deleteEmail,
-  importData as importDbData,
   exportData as exportDbData,
+  mergeImportedData,
+  resetDatabase,
+  changeMasterKey as dbChangeMasterKey,
 } from "@/lib/db";
 import { encryptData, decryptData } from "@/lib/crypto";
 
@@ -58,16 +61,62 @@ interface AppContextType {
   removeGroup: (id: string) => Promise<void>;
   addNewEmail: (address: string) => Promise<void>;
   removeEmail: (id: string) => Promise<void>;
-  importData: (jsonData: string) => Promise<void>;
   exportData: () => Promise<string>;
+  importData: (importedData: {
+    authenticators: Authenticator[];
+    groups: Group[];
+    emails: Email[];
+  }) => Promise<void>;
   refreshData: () => Promise<void>;
+  resetData: () => Promise<void>;
   emailExists: (address: string) => boolean;
+  changeMasterKey: (oldPassword: string, newPassword: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+// Utility
+function base64ToArrayBuffer(base64: string) {
+  const binary = atob(base64);
+  const len = binary.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+// Reducer for better per-item updates
+type AuthAction =
+  | { type: "set_all"; payload: Authenticator[] }
+  | {
+      type: "decrypt_one";
+      payload: { id: string; decrypted: Partial<Authenticator> };
+    };
+
+function authenticatorsReducer(
+  state: Authenticator[],
+  action: AuthAction
+): Authenticator[] {
+  switch (action.type) {
+    case "set_all":
+      return action.payload;
+    case "decrypt_one":
+      return state.map((auth) =>
+        auth.id === action.payload.id
+          ? { ...auth, ...action.payload.decrypted }
+          : auth
+      );
+    default:
+      return state;
+  }
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [authenticators, setAuthenticators] = useState<Authenticator[]>([]);
+  const [authenticators, dispatchAuthenticators] = useReducer(
+    authenticatorsReducer,
+    []
+  );
   const [groups, setGroups] = useState<Group[]>([]);
   const [emails, setEmails] = useState<Email[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,48 +133,59 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         getAllEmails(),
       ]);
 
+      dispatchAuthenticators({ type: "set_all", payload: authData });
+      setGroups(groupData);
+
       if (masterKey) {
-        // Decrypt the authenticators' data
-        const decryptedAuthData = await Promise.all(
-          authData.map(async (auth) => {
+        // Start decrypting authenticators individually
+        authData.forEach(async (auth) => {
+          try {
+            const secretBuffer = base64ToArrayBuffer(auth.secret);
+            const decryptedSecret = await decryptData(secretBuffer, masterKey);
+
+            let decryptedEmail = auth.email;
+            if (auth.email) {
+              const emailBuffer = base64ToArrayBuffer(auth.email);
+              decryptedEmail = await decryptData(emailBuffer, masterKey);
+            }
+
+            dispatchAuthenticators({
+              type: "decrypt_one",
+              payload: {
+                id: auth.id,
+                decrypted: {
+                  secret: decryptedSecret,
+                  email: decryptedEmail,
+                },
+              },
+            });
+          } catch (error) {
+            console.error(
+              `Failed to decrypt authenticator ID ${auth.id}:`,
+              error
+            );
+          }
+        });
+
+        // Decrypt emails in bulk after UI shows
+        const decryptedEmails = await Promise.all(
+          emailData.map(async (email) => {
             try {
-              // Convert base64 back to ArrayBuffer and decrypt
-              const secretBuffer = Uint8Array.from(atob(auth.secret), (c) =>
-                c.charCodeAt(0)
-              ).buffer;
-              const decryptedSecret = await decryptData(
-                secretBuffer,
-                masterKey
-              );
-
-              let decryptedEmail;
-              if (auth.email) {
-                const emailBuffer = Uint8Array.from(atob(auth.email), (c) =>
-                  c.charCodeAt(0)
-                ).buffer;
-                decryptedEmail = await decryptData(emailBuffer, masterKey);
-              }
-
-              return {
-                ...auth,
-                secret: decryptedSecret,
-                email: decryptedEmail || auth.email,
-              };
+              const buffer = base64ToArrayBuffer(email.address);
+              const decryptedAddress = await decryptData(buffer, masterKey);
+              return { ...email, address: decryptedAddress };
             } catch (error) {
-              console.error("Failed to decrypt authenticator:", error);
-              return auth;
+              console.error(`Failed to decrypt email ID ${email.id}:`, error);
+              return email;
             }
           })
         );
-        setAuthenticators(decryptedAuthData);
+        setEmails(decryptedEmails);
       } else {
-        setAuthenticators(authData);
+        setEmails(emailData);
       }
-
-      setGroups(groupData);
-      setEmails(emailData);
     } catch (error) {
-      console.error("Error loading data:", error);
+      console.error("Error refreshing app data:", error);
     } finally {
       setLoading(false);
     }
@@ -144,14 +204,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!masterKey) throw new Error("Master key not set");
 
     const encryptedSecret = await encryptData(authenticator.secret, masterKey);
-    const encryptedEmail = authenticator.email
-      ? await encryptData(authenticator.email, masterKey)
-      : undefined;
-
-    // Convert ArrayBuffer to base64 string
     const secretString = btoa(
       String.fromCharCode(...new Uint8Array(encryptedSecret))
     );
+
+    const encryptedEmail = authenticator.email
+      ? await encryptData(authenticator.email, masterKey)
+      : undefined;
     const emailString = encryptedEmail
       ? btoa(String.fromCharCode(...new Uint8Array(encryptedEmail)))
       : undefined;
@@ -170,7 +229,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   ) => {
     if (!masterKey) throw new Error("Master key not set");
 
-    const encryptedData: Partial<Omit<Authenticator, "id" | "createdAt">> = {
+    const updatedData: Partial<Omit<Authenticator, "id" | "createdAt">> = {
       ...authenticator,
     };
 
@@ -179,19 +238,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         authenticator.secret,
         masterKey
       );
-      encryptedData.secret = btoa(
+      updatedData.secret = btoa(
         String.fromCharCode(...new Uint8Array(encryptedSecret))
       );
     }
 
     if (authenticator.email) {
       const encryptedEmail = await encryptData(authenticator.email, masterKey);
-      encryptedData.email = btoa(
+      updatedData.email = btoa(
         String.fromCharCode(...new Uint8Array(encryptedEmail))
       );
     }
 
-    await updateAuthenticator(id, encryptedData);
+    await updateAuthenticator(id, updatedData);
     await refreshData();
   };
 
@@ -221,7 +280,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addNewEmail = async (address: string) => {
-    await addEmail(address);
+    if (!masterKey) throw new Error("Master key not set");
+    await addEmail(address, masterKey);
     await refreshData();
   };
 
@@ -230,19 +290,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await refreshData();
   };
 
-  const importData = async (jsonData: string) => {
-    await importDbData(jsonData);
+  const exportData = async () => {
+    if (!masterKey) throw new Error("Master key not set");
+    return exportDbData(masterKey);
+  };
+
+  const importData = async (importedData: {
+    authenticators: Authenticator[];
+    groups: Group[];
+    emails: Email[];
+  }) => {
+    if (!masterKey) throw new Error("Master key not set");
+    await mergeImportedData(masterKey, importedData);
     await refreshData();
   };
 
-  const exportData = async () => {
-    return exportDbData();
+  const resetData = async () => {
+    await resetDatabase();
+    setMasterKey(null);
+    await refreshData();
   };
 
   const emailExists = (address: string) => {
     return emails.some(
       (email) => email.address.toLowerCase() === address.toLowerCase()
     );
+  };
+
+  const changeMasterKey = async (oldPassword: string, newPassword: string) => {
+    await dbChangeMasterKey(oldPassword, newPassword);
+    setMasterKey(newPassword);
+    await refreshData();
   };
 
   const value = {
@@ -263,10 +341,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     removeGroup,
     addNewEmail,
     removeEmail,
-    importData,
     exportData,
+    importData,
     refreshData,
+    resetData,
     emailExists,
+    changeMasterKey,
   };
 
   return (

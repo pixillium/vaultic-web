@@ -1,8 +1,9 @@
 "use client";
 
-import type React from "react";
-
+import { toast } from "sonner";
 import { useState, useRef } from "react";
+import { Upload, Lock } from "lucide-react";
+
 import {
   Card,
   CardContent,
@@ -10,13 +11,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useAppContext } from "@/lib/context";
-import { Upload, Lock } from "lucide-react";
-import { encryptData, decryptData, validateDecryptedData } from "@/lib/crypto";
-import { mergeImportedData } from "@/lib/db";
 import {
   Dialog,
   DialogContent,
@@ -25,27 +19,37 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+
+import { useAppContext } from "@/lib/context";
+import { encryptData, decryptData, validateDecryptedData } from "@/lib/crypto";
+
 export default function ImportExportTab() {
-  const { exportData, refreshData } = useAppContext();
-  const [isExporting, setIsExporting] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
-  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const { exportData, refreshData, importData } = useAppContext();
+
+  const [loading, setLoading] = useState(false);
+
+  const [dialogOpen, setDialogOpen] = useState({
+    export: false,
+    import: false,
+  });
   const [exportPassword, setExportPassword] = useState("");
   const [importPassword, setImportPassword] = useState("");
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExportClick = () => {
     setExportPassword("");
-    setIsExportDialogOpen(true);
+    setDialogOpen({ ...dialogOpen, export: true });
   };
 
   const handleImportClick = () => {
     setImportPassword("");
     setSelectedFile(null);
-    setIsImportDialogOpen(true);
+    setDialogOpen({ ...dialogOpen, import: true });
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -58,12 +62,10 @@ export default function ImportExportTab() {
     }
 
     try {
-      setIsExporting(true);
-
-      // Get data to export
-      const data = await exportData();
+      setLoading(true);
 
       // Encrypt the data
+      const data = await exportData();
       const encryptedData = await encryptData(data, exportPassword);
 
       // Create a download link
@@ -72,23 +74,24 @@ export default function ImportExportTab() {
       });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
+
       a.href = url;
-      a.download = `2fa-manager-export-${
+      a.download = `Vaultic-export-${
         new Date().toISOString().split("T")[0]
       }.vauc`;
+
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
       toast.success("Data exported successfully");
-
-      setIsExportDialogOpen(false);
+      setDialogOpen({ ...dialogOpen, export: false });
     } catch (error) {
       console.error("Error exporting data:", error);
       toast.error("Failed to export data");
     } finally {
-      setIsExporting(false);
+      setLoading(false);
     }
   };
 
@@ -110,35 +113,32 @@ export default function ImportExportTab() {
     }
 
     try {
-      setIsImporting(true);
+      setLoading(true);
 
       // Read the file
       const fileBuffer = await selectedFile.arrayBuffer();
-
-      // Decrypt the data
       const decryptedData = await decryptData(fileBuffer, importPassword);
 
       // Parse and validate the decrypted data
       const parsedData = JSON.parse(decryptedData);
+      console.log("Parsed Data:", parsedData);
 
       if (!validateDecryptedData(parsedData)) {
-        throw new Error("Invalid data format");
+        toast.error("Invalid data structure in the file");
+        return;
       }
 
       // Merge the imported data with existing data
-      await mergeImportedData(parsedData);
-
-      // Refresh the UI
+      await importData(parsedData);
       await refreshData();
 
       toast.success("Data imported successfully");
-
-      setIsImportDialogOpen(false);
+      setDialogOpen({ ...dialogOpen, import: false });
     } catch (error) {
       console.error("Error importing data:", error);
       toast.error("Failed to import data");
     } finally {
-      setIsImporting(false);
+      setLoading(false);
     }
   };
 
@@ -175,7 +175,12 @@ export default function ImportExportTab() {
       </Card>
 
       {/* Export Password Dialog */}
-      <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+      <Dialog
+        open={dialogOpen.export}
+        onOpenChange={(setOpen) =>
+          setDialogOpen({ ...dialogOpen, export: setOpen })
+        }
+      >
         <DialogContent className="!max-w-md">
           <DialogHeader>
             <DialogTitle>Export Encrypted Data</DialogTitle>
@@ -199,19 +204,24 @@ export default function ImportExportTab() {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setIsExportDialogOpen(false)}
+              onClick={() => setDialogOpen({ ...dialogOpen, export: false })}
             >
               Cancel
             </Button>
-            <Button onClick={handleExport} disabled={isExporting}>
-              {isExporting ? "Exporting..." : "Export"}
+            <Button onClick={handleExport} disabled={loading}>
+              {loading ? "Exporting..." : "Export"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Import Password Dialog */}
-      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+      <Dialog
+        open={dialogOpen.import}
+        onOpenChange={(setOpen) =>
+          setDialogOpen({ ...dialogOpen, import: setOpen })
+        }
+      >
         <DialogContent className="!max-w-md">
           <DialogHeader>
             <DialogTitle>Import Encrypted Data</DialogTitle>
@@ -244,15 +254,12 @@ export default function ImportExportTab() {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setIsImportDialogOpen(false)}
+              onClick={() => setDialogOpen({ ...dialogOpen, import: false })}
             >
               Cancel
             </Button>
-            <Button
-              onClick={handleImport}
-              disabled={isImporting || !selectedFile}
-            >
-              {isImporting ? "Importing..." : "Import"}
+            <Button onClick={handleImport} disabled={loading || !selectedFile}>
+              {loading ? "Importing..." : "Import"}
             </Button>
           </DialogFooter>
         </DialogContent>

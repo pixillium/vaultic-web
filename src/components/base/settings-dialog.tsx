@@ -14,6 +14,8 @@ import ThemeSettings from "./theme-settings";
 import ImportExportTab from "./import-export-tab";
 import EmailsManagement from "./emails-management";
 import GroupsManagement from "./groups-management";
+import ResetSettings from "./reset-settings";
+import ChangeMasterKeySettings from "./change-master-key-settings";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -44,6 +46,8 @@ export default function SettingsDialog({
               <TabsTrigger value="emails">Emails</TabsTrigger>
               <TabsTrigger value="import-export">Sync</TabsTrigger>
               <TabsTrigger value="appearance">Theme</TabsTrigger>
+              <TabsTrigger value="security">Security</TabsTrigger>
+              <TabsTrigger value="reset">Reset</TabsTrigger>
             </TabsList>
 
             <TabsContent value="groups">
@@ -57,6 +61,14 @@ export default function SettingsDialog({
             </TabsContent>
             <TabsContent value="appearance">
               <ThemeSettings />
+            </TabsContent>
+            <TabsContent value="security">
+              <div className="space-y-6">
+                <ChangeMasterKeySettings />
+              </div>
+            </TabsContent>
+            <TabsContent value="reset">
+              <ResetSettings />
             </TabsContent>
           </Tabs>
         </div>

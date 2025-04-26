@@ -1,34 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import type { Authenticator, Group } from "@/lib/db";
-import {
-  generateOTP,
-  getRemainingSeconds,
-  formatRemainingTime,
-} from "@/lib/utils";
 import { MoreVertical, Edit, Trash2, GripHorizontal, X } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Progress } from "@/components/ui/progress";
-import { useAppContext } from "@/lib/context";
-import EditAuthenticatorDialog from "./edit-authenticator-dialog";
-import ServiceLogo from "./service-logo";
-import { toast } from "sonner";
+
+import { CSS } from "@dnd-kit/utilities";
+import { useSortable } from "@dnd-kit/sortable";
+
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -40,6 +17,35 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "../ui/alert-dialog";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+} from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+
+import {
+  generateOTP,
+  getRemainingSeconds,
+  formatRemainingTime,
+} from "@/lib/utils";
+import { useAppContext } from "@/lib/context";
+import type { Authenticator, Group } from "@/lib/db";
+
+import ServiceLogo from "./service-logo";
+import EditAuthenticatorDialog from "./edit-authenticator-dialog";
+
+import { toast } from "sonner";
+import isBase64 from "is-base64";
 
 interface AuthenticatorCardProps {
   authenticator: Authenticator;
@@ -51,8 +57,10 @@ export default function AuthenticatorCard({
   group,
 }: AuthenticatorCardProps) {
   const { removeAuthenticator } = useAppContext();
+
   const [code, setCode] = useState("");
   const [remainingTime, setRemainingTime] = useState(30);
+
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -65,6 +73,14 @@ export default function AuthenticatorCard({
   };
 
   useEffect(() => {
+    if (
+      isBase64(authenticator.secret) &&
+      !/^[A-Z2-7]+=*$/.test(
+        authenticator.secret.replace(/\s+/g, "").toUpperCase()
+      )
+    )
+      return;
+
     // Generate initial code
     setCode(generateOTP(authenticator.secret));
     setRemainingTime(getRemainingSeconds());
@@ -120,7 +136,11 @@ export default function AuthenticatorCard({
               <div>
                 <h3 className="font-semibold text-lg">{authenticator.name}</h3>
                 <p className="text-sm text-muted-foreground">
-                  {authenticator.email ? authenticator.email : "No email"}
+                  {authenticator.email
+                    ? isBase64(authenticator.email)
+                      ? "Decrypting"
+                      : authenticator.email
+                    : "No email"}
                 </p>
               </div>
             </div>
@@ -187,8 +207,14 @@ export default function AuthenticatorCard({
             onClick={handleCopyCode}
           >
             <div className="text-3xl font-mono tracking-wider">
-              {code.slice(0, 3)} <span className="text-lime-400">•</span>{" "}
-              {code.slice(3)}
+              {code.length <= 0 ? (
+                <span className="text-muted-foreground">DECRYPTING</span>
+              ) : (
+                <>
+                  {code.slice(0, 3)} <span className="text-lime-400">•</span>{" "}
+                  {code.slice(3)}
+                </>
+              )}
             </div>
           </div>
         </CardContent>

@@ -21,10 +21,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAppContext } from "@/lib/context";
-import { validateSecret } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 
 import { toast } from "sonner";
+import isBase64 from "is-base64";
 
 interface AddAuthenticatorDialogProps {
   open: boolean;
@@ -60,7 +60,7 @@ export default function AddAuthenticatorDialog({
       return;
     }
 
-    if (!validateSecret(secret)) {
+    if (!isBase64(secret)) {
       toast.error("Invalid secret key format");
       return;
     }
@@ -100,7 +100,7 @@ export default function AddAuthenticatorDialog({
 
   const handleSecretChange = (value: string) => {
     setSecret(value);
-    if (secretError && validateSecret(value)) {
+    if (secretError && isBase64(value)) {
       setSecretError("");
     }
   };
